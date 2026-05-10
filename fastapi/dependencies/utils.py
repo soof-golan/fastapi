@@ -682,16 +682,16 @@ async def solve_dependencies(
             values[sub_dependant.name] = solved
         if sub_dependant.cache_key not in dependency_cache:
             dependency_cache[sub_dependant.cache_key] = solved
-    path_values, path_errors = request_params_to_args(
+    path_values, path_errors = await request_params_to_args(
         dependant.path_params, request.path_params
     )
-    query_values, query_errors = request_params_to_args(
+    query_values, query_errors = await request_params_to_args(
         dependant.query_params, request.query_params
     )
-    header_values, header_errors = request_params_to_args(
+    header_values, header_errors = await request_params_to_args(
         dependant.header_params, request.headers
     )
-    cookie_values, cookie_errors = request_params_to_args(
+    cookie_values, cookie_errors = await request_params_to_args(
         dependant.cookie_params, request.cookies
     )
     values.update(path_values)
@@ -781,7 +781,7 @@ def _get_multidict_value(
     return value
 
 
-def request_params_to_args(
+async def request_params_to_args(
     fields: Sequence[ModelField],
     received_params: Mapping[str, Any] | QueryParams | Headers,
 ) -> tuple[dict[str, Any], list[Any]]:
@@ -844,8 +844,12 @@ def request_params_to_args(
             "Params must be subclasses of Param"
         )
         loc: tuple[str, ...] = (field_info.in_.value,)
-        v_, errors_ = _validate_value_with_model_field(
-            field=first_field, value=params_to_process, values=values, loc=loc
+        v_, errors_ = await run_in_threadpool(
+            _validate_value_with_model_field,
+            field=first_field,
+            value=params_to_process,
+            values=values,
+            loc=loc,
         )
         return {first_field.name: v_}, errors_
 
@@ -856,8 +860,12 @@ def request_params_to_args(
             "Params must be subclasses of Param"
         )
         loc = (field_info.in_.value, get_validation_alias(field))
-        v_, errors_ = _validate_value_with_model_field(
-            field=field, value=value, values=values, loc=loc
+        v_, errors_ = await run_in_threadpool(
+            _validate_value_with_model_field,
+            field=field,
+            value=value,
+            values=values,
+            loc=loc,
         )
         if errors_:
             errors.extend(errors_)
@@ -974,8 +982,12 @@ async def request_body_to_args(
 
     if single_not_embedded_field:
         loc: tuple[str, ...] = ("body",)
-        v_, errors_ = _validate_value_with_model_field(
-            field=first_field, value=body_to_process, values=values, loc=loc
+        v_, errors_ = await run_in_threadpool(
+            _validate_value_with_model_field,
+            field=first_field,
+            value=body_to_process,
+            values=values,
+            loc=loc,
         )
         return {first_field.name: v_}, errors_
     for field in body_fields:
@@ -988,8 +1000,12 @@ async def request_body_to_args(
             except AttributeError:
                 errors.append(get_missing_field_error(loc))
                 continue
-        v_, errors_ = _validate_value_with_model_field(
-            field=field, value=value, values=values, loc=loc
+        v_, errors_ = await run_in_threadpool(
+            _validate_value_with_model_field,
+            field=field,
+            value=value,
+            values=values,
+            loc=loc,
         )
         if errors_:
             errors.extend(errors_)
